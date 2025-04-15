@@ -36,6 +36,9 @@
 (define-constant ERR_ZERO_PRICE (err u106))
 (define-constant ERR_INVALID_BLOCK (err u107))
 (define-constant ERR_PROVIDER_EXISTS (err u108))
+(define-constant ERR_INVALID_NAME (err u111))
+(define-constant ERR_INVALID_TARGET (err u112))
+(define-constant ERR_INVALID_RECIPIENT (err u113))
 
 ;; Configuration - Oracle parameters
 ;;
@@ -101,9 +104,7 @@
 ;;
 (define-non-fungible-token donation-certificate uint)
 
-;; ==========================================
 ;; PRIVATE FUNCTIONS - ORACLE
-;; ==========================================
 
 (define-private (is-contract-owner)
   (is-eq tx-sender CONTRACT_OWNER)
@@ -142,9 +143,7 @@
     min-price)
 )
 
-;; ==========================================
 ;; PRIVATE FUNCTIONS - DONATION PLATFORM
-;; ==========================================
 
 (define-private (mint-certificate (donor principal) (cause-id uint))
   (let 
@@ -159,14 +158,14 @@
   )
 )
 
-;; ==========================================
 ;; PUBLIC FUNCTIONS - ORACLE MANAGEMENT
-;; ==========================================
 
 (define-public (add-price-provider (provider principal))
   (begin
     (asserts! (is-contract-owner) ERR_NOT_AUTHORIZED)
     (asserts! (< (var-get active-providers) MAX_PRICE_PROVIDERS) ERR_NOT_AUTHORIZED)
+    (asserts! (not (default-to false (map-get? price-providers provider))) ERR_PROVIDER_EXISTS)
+    
     (let ((provider-count (var-get active-providers)))
       (map-set price-providers provider true)
       (map-set active-provider-list provider-count provider)
@@ -178,6 +177,8 @@
 (define-public (remove-price-provider (provider principal))
   (begin
     (asserts! (is-contract-owner) ERR_NOT_AUTHORIZED)
+    (asserts! (default-to false (map-get? price-providers provider)) ERR_NOT_AUTHORIZED)
+    
     (let ((provider-count (var-get active-providers)))
       (map-delete price-providers provider)
       (map-delete provider-prices provider)
@@ -207,16 +208,15 @@
   )
 )
 
-;; ==========================================
 ;; PUBLIC FUNCTIONS - DONATION PLATFORM
-;; ==========================================
 
 (define-public (create-cause (name (string-ascii 64)) (target uint) (recipient principal))
-  (let 
-    (
-      (cause-id (var-get next-cause-id))
-    )
-    (begin
+  (begin
+    (asserts! (> (len name) u0) ERR_INVALID_NAME)
+    (asserts! (> target u0) ERR_INVALID_TARGET)
+    (asserts! (is-valid-recipient recipient) ERR_INVALID_RECIPIENT)
+    
+    (let ((cause-id (var-get next-cause-id)))
       (map-set causes 
         {cause-id: cause-id} 
         {
@@ -232,9 +232,12 @@
   )
 )
 
-;; ==========================================
+;; function to validate recipient addresses
+(define-private (is-valid-recipient (address principal))
+  true
+)
+
 ;; READ-ONLY FUNCTIONS - ORACLE
-;; ==========================================
 
 (define-read-only (get-current-price)
   (begin
@@ -262,9 +265,7 @@
     (err u106))  ;; Error if no price exists for that block
 )
 
-;; ==========================================
 ;; READ-ONLY FUNCTIONS - DONATION PLATFORM
-;; ==========================================
 
 (define-read-only (get-cause (cause-id uint))
   (map-get? causes {cause-id: cause-id})
