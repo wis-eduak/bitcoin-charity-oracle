@@ -62,3 +62,72 @@
 ;; Initialize error messages
 (map-insert error-messages ERR_NOT_AUTHORIZED "Not authorized to perform this action")
 (map-insert error-messages ERR_STALE_PRICE "Price data is stale")
+
+(map-insert error-messages ERR_INSUFFICIENT_PROVIDERS "Insufficient number of price providers")
+
+(map-insert error-messages ERR_PRICE_TOO_LOW "Price is below minimum threshold")
+
+(map-insert error-messages ERR_PRICE_TOO_HIGH "Price is above maximum threshold")
+
+(map-insert error-messages ERR_PRICE_DEVIATION "Price deviates too much from median")
+
+(map-insert error-messages ERR_ZERO_PRICE "Price cannot be zero")
+
+(map-insert error-messages ERR_INVALID_BLOCK "Invalid block height provided")
+
+(map-insert error-messages ERR_PROVIDER_EXISTS "Provider already exists")
+
+;; Maps - Oracle data storage
+;;
+(define-map price-providers principal bool)
+(define-map provider-prices principal uint)
+(define-map provider-last-update principal uint)
+(define-map active-provider-list uint principal)
+(define-map historical-prices uint {price: uint, block: uint})
+
+;; Maps - Donation platform data storage
+;;
+(define-map donations 
+  (tuple (donor principal) (cause-id uint)) 
+  (tuple (amount uint) (timestamp uint))
+)
+
+(define-map causes 
+  (tuple (cause-id uint)) 
+  (tuple (name (string-ascii 64)) (target uint) (raised uint) (recipient principal))
+)
+
+;; NFT - Donation certificates
+;;
+(define-non-fungible-token donation-certificate uint)
+
+;; ==========================================
+;; PRIVATE FUNCTIONS - ORACLE
+;; ==========================================
+
+(define-private (is-contract-owner)
+  (is-eq tx-sender CONTRACT_OWNER)
+)
+
+(define-private (is-authorized-provider (provider principal))
+  (default-to false (map-get? price-providers provider))
+)
+
+(define-private (get-provider-price (provider principal))
+  (default-to u0 (map-get? provider-prices provider))
+)
+
+(define-private (collect-provider-prices (index uint) (prices (list 100 uint)))
+  (match (map-get? active-provider-list index)
+    provider (let ((price (get-provider-price provider)))
+               (if (> price u0)
+                 (unwrap! (as-max-len? (append prices price) u100) prices)
+                 prices))
+    prices)
+)
+
+(define-private (get-all-provider-prices)
+  (fold collect-provider-prices
+    (list u0 u1 u2 u3 u4 u5 u6 u7 u8 u9)
+    (list))
+)
