@@ -206,3 +206,70 @@
     )
   )
 )
+
+;; ==========================================
+;; PUBLIC FUNCTIONS - DONATION PLATFORM
+;; ==========================================
+
+(define-public (create-cause (name (string-ascii 64)) (target uint) (recipient principal))
+  (let 
+    (
+      (cause-id (var-get next-cause-id))
+    )
+    (begin
+      (map-set causes 
+        {cause-id: cause-id} 
+        {
+          name: name, 
+          target: target, 
+          raised: u0, 
+          recipient: recipient
+        }
+      )
+      (var-set next-cause-id (+ cause-id u1))
+      (ok cause-id)
+    )
+  )
+)
+
+;; ==========================================
+;; READ-ONLY FUNCTIONS - ORACLE
+;; ==========================================
+
+(define-read-only (get-current-price)
+  (begin
+    (asserts! (< (- stacks-block-height (var-get last-update-block)) MAX_PRICE_AGE) 
+             ERR_STALE_PRICE)
+    (ok (var-get current-price))
+  )
+)
+
+(define-read-only (get-price-provider-count)
+  (var-get active-providers)
+)
+
+(define-read-only (get-provider-status (provider principal))
+  (map-get? price-providers provider)
+)
+
+(define-read-only (get-last-update-block)
+  (var-get last-update-block)
+)
+
+(define-read-only (get-historical-price (block uint))
+  (match (map-get? historical-prices block)
+    price-data (ok price-data)
+    (err u106))  ;; Error if no price exists for that block
+)
+
+;; ==========================================
+;; READ-ONLY FUNCTIONS - DONATION PLATFORM
+;; ==========================================
+
+(define-read-only (get-cause (cause-id uint))
+  (map-get? causes {cause-id: cause-id})
+)
+
+(define-read-only (get-donation (donor principal) (cause-id uint))
+  (map-get? donations {donor: donor, cause-id: cause-id})
+)
